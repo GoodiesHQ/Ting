@@ -13,36 +13,46 @@ static inline size_t ting_gre_packet_size(ting_hdr_gre *gre_hdr)
 
 bool ting_feature_gre_init(void)
 {
+    ting_gre_seq = 0;
+    memset((void*)&ting_gre_sa, 0, sizeof(ting_gre_sa));
     memset((void*)ting_gre_buf, 0, sizeof(ting_gre_buf));
-    if((ting_gre_sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_GRE)) == -1)
+
+    if((ting_gre_sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_GRE)) < 0)
     {
         return false;
     }
 
+    ting_gre_sa.sin_family = AF_INET;
+    ting_gre_sa.sin_addr.s_addr = inet_addr(TING_GRE_DESTINATION);
+
     return true;
 }
 
-ting_hdr_ip* ting_gre_encapsulate(void *packet, size_t size, uint32_t sequence)
+void ting_feature_gre_process(char *buffer, uint16_t size)
 {
-    ting_hdr_ip *ip, *gre_ip;
-    ting_hdr_gre *gre;
-    void *ptr;
-
-    ip = (ting_hdr_ip*)packet;
-    gre = (ting_hdr_gre*)(ip + 1);
-
-    // RFC 2637
-    gre->proto = 0x880B;
+    /*
+     * Process each packet and forward them over a GRE tunnel
+     *
+     * RFC 2637 - PPTP GRE
+     */
+    size_t total_size = (size_t)size + sizeof(ting_hdr_gre);
+    memset((void*)ting_gre_buf, 0, sizeof(ting_gre_buf));
+    ting_hdr_gre *gre = (ting_hdr_gre*)ting_gre_buf;
 
     gre->has_cksum = false;
     gre->has_route = false;
     gre->has_key = true;
-    gre->has_seq = true; // all data packets should have a sequence number
-    gre->strict = false;
+    gre->has_seq = true;
     gre->recur = 0;
-    gre->ack = 0;
+    gre->has_ack = false;
     gre->flags = 0;
     gre->version = TING_GRE_VERSION;
+    gre->proto = ting_be16(0x880B);
+    gre->key_payload_len = size;
+    gre->key_call_id = 1;
+    gre->seq_num = ting_gre_seq++;
 
-    return NULL;
+    memmove((void*)(ting_gre_buf + sizeof(ting_hdr_gre)), buffer, size);
+
+    sendto(ting_gre_sockfd, (void*)ting_gre_buf, total_size, 0, (struct sockaddr*)&ting_gre_sa, sizeof(struct sockaddr));
 }

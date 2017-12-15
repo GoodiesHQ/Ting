@@ -1,9 +1,9 @@
 #ifndef TING_TING_H
 #define TING_TING_H
 
-#include <ting/endian.h>
-#include <ting/packet.h>
 #include <ting/gre.h>
+#include <ting/packet.h>
+#include <ting/endian.h>
 #include <stddef.h>
 #include <stdbool.h>
 
