@@ -1,15 +1,6 @@
+#include <stdio.h>
 #include <ting/gre.h>
 #include <ting/packet.h>
-
-
-static inline size_t ting_gre_packet_size(ting_hdr_gre *gre_hdr)
-{
-    size_t size = sizeof(ting_hdr_gre);
-    if(gre_hdr->has_cksum) size += 4;   // key exists
-    if(gre_hdr->has_key) size += 4;     // sequence exists
-    if(gre_hdr->has_seq) size += 4;     // checksum exists
-    return size;
-}
 
 bool ting_feature_gre_init(void)
 {
@@ -28,16 +19,9 @@ bool ting_feature_gre_init(void)
     return true;
 }
 
-void ting_feature_gre_process(char *buffer, uint16_t size)
-{
-    /*
-     * Process each packet and forward them over a GRE tunnel
-     *
-     * RFC 2637 - PPTP GRE
-     */
-    size_t total_size = (size_t)size + sizeof(ting_hdr_gre);
-    memset((void*)ting_gre_buf, 0, sizeof(ting_gre_buf));
-    ting_hdr_gre *gre = (ting_hdr_gre*)ting_gre_buf;
+void ting_feature_gre_process(char *buffer, uint16_t size) {
+    memset((void *) ting_gre_buf, 0, sizeof(ting_gre_buf));
+    ting_hdr_gre *gre = (ting_hdr_gre *) ting_gre_buf;
 
     gre->has_cksum = false;
     gre->has_route = false;
@@ -47,12 +31,43 @@ void ting_feature_gre_process(char *buffer, uint16_t size)
     gre->has_ack = false;
     gre->flags = 0;
     gre->version = TING_GRE_VERSION;
-    gre->proto = ting_be16(0x880B);
-    gre->key_payload_len = size;
-    gre->key_call_id = 1;
-    gre->seq_num = ting_gre_seq++;
+    gre->proto = ting_be16(ETH_P_IP);
 
-    memmove((void*)(ting_gre_buf + sizeof(ting_hdr_gre)), buffer, size);
+    ting_hdr_eth *eth = (ting_hdr_eth*)buffer;
+    if(eth->h_proto != ting_be16(ETH_P_IP))
+    {
+        return;
+    }
 
-    sendto(ting_gre_sockfd, (void*)ting_gre_buf, total_size, 0, (struct sockaddr*)&ting_gre_sa, sizeof(struct sockaddr));
+    size_t offset = (size_t)sizeof(struct grehdr);
+
+    if (gre->has_key)
+    {
+        struct grehdr_key *key = (struct grehdr_key*) (ting_gre_buf + offset);
+        key->key = ting_be32(TING_GRE_KEY);
+        offset += sizeof(key->key);
+    }
+
+    if (gre->has_seq)
+    {
+        struct grehdr_seq *seq = (struct grehdr_seq*) (ting_gre_buf + offset);
+        seq->seq = ting_be32(ting_gre_seq++);
+        offset += sizeof(seq->seq);
+    }
+
+    if (gre->has_ack)
+    {
+        struct grehdr_ack *ack = (struct grehdr_ack*) (ting_gre_buf + offset);
+        ack->ack = ting_be32(ting_gre_seq);
+        offset += sizeof(ack->ack);
+    }
+
+    size_t total_size = (size_t)size + offset - sizeof(ting_hdr_eth);
+
+    memmove((void *) (ting_gre_buf + offset), (void*)(buffer + sizeof(ting_hdr_eth)), size - sizeof(ting_hdr_eth));
+
+    if (ting_gre_sockfd >= 0) {
+        sendto(ting_gre_sockfd, (void *) ting_gre_buf, total_size, 0, (struct sockaddr *) &ting_gre_sa,
+               sizeof(struct sockaddr));
+    }
 }
