@@ -1,3 +1,4 @@
+
 # Ting
 
 Simple, albeit portable, utility designed for "administrating" Linux-based routers.
@@ -23,4 +24,6 @@ Rootkits sold seperately.
 
 ### Features:
 
- - Establish a GRE tunnel to a server (`TING_GRE_DESTINATION` in `inc/ting/gre.h`) and duplicate all received IPv4 packets over the tunnel.
+ - Establish a GRE transparent ethernet tunnel to a server and send a copy of all received ethernet frames.
+   - The GRE server is defined as `TING_GRE_DESTINATION` in `inc/ting/gre.h`. Change it to your desired IPv4 address. By default, it is `"7.7.7.7"` which is a bogon, so nothing will happen.
+   - All ethernet frames are duplicated. This pay potentially be a LOT. Add `-DTING_CAPTURE_IP_ONLY` will change the socket's protocol to  `ETH_P_IP` instead of `ETH_P_ALL` and will strip the Ethernet header so that only get IP packets are sent across the GRE tunnel (this will still accept multicast packets).
