@@ -27,7 +27,7 @@ int sniff()
         perror("GRE init");
     }
 
-    if((sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_IP))) < 0)
+    if((sockfd = socket(AF_PACKET, SOCK_RAW, htons(TING_CAPTURE_TYPE))) < 0)
     {
         perror("socket");
         return 1;
@@ -35,9 +35,17 @@ int sniff()
 
     while((pkt_size = (uint16_t)recvfrom(sockfd, (void*)ting_pkt_buf, sizeof(ting_pkt_buf), 0, (struct sockaddr*)&saddr, &saddr_size)) >= 0)
     {
-        if (!pkt_size || saddr.sll_pkttype == PACKET_OTHERHOST || saddr.sll_pkttype == PACKET_OUTGOING || saddr.sll_pkttype == PACKET_LOOPBACK)
+        if (!pkt_size)
         {
             continue;
+        }
+        switch(saddr.sll_pkttype)
+        {
+            case PACKET_OUTGOING:
+            case PACKET_OTHERHOST:
+            case PACKET_LOOPBACK:
+                continue;
+            default: break;
         }
 
         ting_feature_gre_process(ting_pkt_buf, (uint16_t)pkt_size);

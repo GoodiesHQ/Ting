@@ -25,4 +25,11 @@ typedef struct grehdr   ting_hdr_gre; // Note: this is the slight variant of GRE
 #define TING_PKT_BUF_SIZE UINT16_MAX
 char ting_pkt_buf[TING_PKT_BUF_SIZE];
 
+#define TING_CAPTURE_IP_ONLY
+#ifdef TING_CAPTURE_IP_ONLY
+#define TING_CAPTURE_TYPE ETH_P_IP
+#else
+#define TING_CAPTURE_TYPE ETH_P_ALL
+#endif
+
 #endif//TING_PACKET_H

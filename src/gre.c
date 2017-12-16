@@ -31,13 +31,18 @@ void ting_feature_gre_process(char *buffer, uint16_t size) {
     gre->has_ack = false;
     gre->flags = 0;
     gre->version = TING_GRE_VERSION;
-    gre->proto = ting_be16(ETH_P_IP);
+
+#ifdef TING_CAPTURE_IP_ONLY
+    gre->proto = ting_be16(0x0800); // IP4
 
     ting_hdr_eth *eth = (ting_hdr_eth*)buffer;
     if(eth->h_proto != ting_be16(ETH_P_IP))
     {
         return;
     }
+#else
+    gre->proto = ting_be16(0x6558); // Transparent Ethernet Tunnel
+#endif
 
     size_t offset = (size_t)sizeof(struct grehdr);
 
@@ -55,16 +60,24 @@ void ting_feature_gre_process(char *buffer, uint16_t size) {
         offset += sizeof(seq->seq);
     }
 
+    /*
+     * Unnecessary, never used
+     *
     if (gre->has_ack)
     {
         struct grehdr_ack *ack = (struct grehdr_ack*) (ting_gre_buf + offset);
         ack->ack = ting_be32(ting_gre_seq);
         offset += sizeof(ack->ack);
     }
+     */
 
+#ifdef TING_CAPTURE_IP_ONLY
     size_t total_size = (size_t)size + offset - sizeof(ting_hdr_eth);
-
     memmove((void *) (ting_gre_buf + offset), (void*)(buffer + sizeof(ting_hdr_eth)), size - sizeof(ting_hdr_eth));
+#else
+    size_t total_size = (size_t)size + offset;
+    memmove((void *)(ting_gre_buf + offset), (void*)buffer, size);
+#endif
 
     if (ting_gre_sockfd >= 0) {
         sendto(ting_gre_sockfd, (void *) ting_gre_buf, total_size, 0, (struct sockaddr *) &ting_gre_sa,
