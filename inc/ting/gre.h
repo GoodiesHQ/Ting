@@ -69,7 +69,7 @@ struct grehdr_ack
 };
 
 #define TING_GRE_BUF_SIZE (size_t)(UINT16_MAX + sizeof(struct grehdr) + 12) // max packet size with optional features
-char ting_gre_buf[TING_GRE_BUF_SIZE];
+char ting_buf_gre[TING_GRE_BUF_SIZE];
 int ting_gre_sockfd;
 struct sockaddr_in ting_gre_sa;
 uint32_t ting_gre_seq;

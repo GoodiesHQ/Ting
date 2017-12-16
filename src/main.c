@@ -21,11 +21,8 @@ int sniff()
     struct sockaddr_ll saddr;
     socklen_t saddr_size = sizeof(saddr);
     int sockfd;
+    size_t i;
 
-    if(ting_feature_gre_init() == false)
-    {
-        perror("GRE init");
-    }
 
     if((sockfd = socket(AF_PACKET, SOCK_RAW, htons(TING_CAPTURE_TYPE))) < 0)
     {
@@ -33,12 +30,13 @@ int sniff()
         return 1;
     }
 
-    while((pkt_size = (uint16_t)recvfrom(sockfd, (void*)ting_pkt_buf, sizeof(ting_pkt_buf), 0, (struct sockaddr*)&saddr, &saddr_size)) >= 0)
+    while((pkt_size = (uint16_t)recvfrom(sockfd, (void*)ting_buf_pkt, sizeof(ting_buf_pkt), 0, (struct sockaddr*)&saddr, &saddr_size)) >= 0)
     {
         if (!pkt_size)
         {
             continue;
         }
+
         switch(saddr.sll_pkttype)
         {
             case PACKET_OUTGOING:
@@ -48,12 +46,28 @@ int sniff()
             default: break;
         }
 
-        ting_feature_gre_process(ting_pkt_buf, (uint16_t)pkt_size);
+        for(i = 0; i < TING_FEATURE_COUNT; ++i)
+        {
+            if(ting_features[i].process != NULL)
+            {
+                ting_features[i].process(ting_buf_pkt, (uint16_t)pkt_size);
+            }
+        }
     }
 }
 
 int main()
 {
+    size_t i;
+
+    for(i = 0; i < TING_FEATURE_COUNT; ++i)
+    {
+        if(ting_features[i].init() == false)
+        {
+            ting_features[i].process = NULL;
+        }
+    }
+
     sniff();
     return 0;
 }
