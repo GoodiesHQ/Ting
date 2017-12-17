@@ -30,7 +30,7 @@ int sniff()
         return 1;
     }
 
-    while((pkt_size = (uint16_t)recvfrom(sockfd, (void*)ting_buf_pkt, sizeof(ting_buf_pkt), 0, (struct sockaddr*)&saddr, &saddr_size)) >= 0)
+    while((pkt_size = recvfrom(sockfd, (void*)ting_buf_pkt, sizeof(ting_buf_pkt), 0, (struct sockaddr*)&saddr, &saddr_size)) >= 0)
     {
         if (!pkt_size)
         {
