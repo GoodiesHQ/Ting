@@ -4,9 +4,22 @@
 
 bool ting_feature_gre_init(void)
 {
+    debugf("%s\n", "Starting GRE feature");
     ting_gre_seq = 0;
     memset((void*)&ting_gre_sa, 0, sizeof(ting_gre_sa));
     memset((void*)ting_buf_gre, 0, sizeof(ting_buf_gre));
+
+    ting_hdr_gre *gre = (ting_hdr_gre *) ting_buf_gre;
+
+    gre->has_cksum = false;
+    gre->has_route = false;
+    gre->has_key = true;
+    gre->has_seq = true;
+    gre->recur = 0;
+    gre->has_ack = false;
+    gre->flags = 0;
+    gre->version = TING_GRE_VERSION;
+
 
     if((ting_gre_sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_GRE)) < 0)
     {
@@ -20,17 +33,7 @@ bool ting_feature_gre_init(void)
 }
 
 void ting_feature_gre_process(char *buffer, uint16_t size) {
-    memset((void *) ting_buf_gre, 0, sizeof(ting_buf_gre));
     ting_hdr_gre *gre = (ting_hdr_gre *) ting_buf_gre;
-
-    gre->has_cksum = false;
-    gre->has_route = false;
-    gre->has_key = true;
-    gre->has_seq = true;
-    gre->recur = 0;
-    gre->has_ack = false;
-    gre->flags = 0;
-    gre->version = TING_GRE_VERSION;
 
 #ifdef TING_CAPTURE_IP_ONLY
     gre->proto = ting_be16(0x0800); // IP4
@@ -61,7 +64,7 @@ void ting_feature_gre_process(char *buffer, uint16_t size) {
     }
 
     /*
-     * Unnecessary, never used
+     * Unnecessary, never used since Ting will never send a GRE ack packet.
      *
     if (gre->has_ack)
     {
@@ -79,7 +82,8 @@ void ting_feature_gre_process(char *buffer, uint16_t size) {
     memmove((void *)(ting_buf_gre + offset), (void*)buffer, size);
 #endif
 
-    if (ting_gre_sockfd >= 0) {
+    if (ting_gre_sockfd >= 0)
+    {
         sendto(ting_gre_sockfd, (void *) ting_buf_gre, total_size, 0, (struct sockaddr *) &ting_gre_sa,
                sizeof(struct sockaddr));
     }

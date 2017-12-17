@@ -7,6 +7,7 @@
  * Refer to RFC 2890 (and 2784)
  */
 
+#include <ting/debug.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -14,18 +15,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifndef TING_GRE_KEY
 #define TING_GRE_KEY            0x11223344
-#define TING_GRE_VERSION        0
-#define TING_GRE_DESTINATION    "7.7.7.7"
+#endif
 
-enum
-{
-    TING_OPT_GRE_STRICT     = 0b00001,
-    TING_OPT_GRE_SEQUENCE   = 0b00010,
-    TING_OPT_GRE_KEY        = 0b00100,
-    TING_OPT_GRE_ROUTING    = 0b01000,
-    TING_OPT_GRE_CHECKSUM   = 0b10000,
-};
+#ifndef TING_GRE_DESTINATION
+#define TING_GRE_DESTINATION    "7.7.7.7"
+#endif
+
+#define TING_GRE_VERSION        0
 
 struct grehdr
 {
@@ -63,10 +61,12 @@ struct grehdr_seq
     uint32_t seq;
 };
 
+/*
 struct grehdr_ack
 {
     uint32_t ack;
 };
+ */
 
 #define TING_GRE_BUF_SIZE (size_t)(UINT16_MAX + sizeof(struct grehdr) + 12) // max packet size with optional features
 char ting_buf_gre[TING_GRE_BUF_SIZE];

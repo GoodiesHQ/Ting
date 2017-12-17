@@ -1,14 +1,21 @@
+#include <ting/debug.h>
 #include <ting/dns.h>
 #include <stdio.h>
 
 bool ting_feature_dns_init(void)
 {
+    debugf("%s\n", "Starting DNS feature");
     memset((void*)ting_buf_dns, 0, sizeof(ting_buf_dns));
     return true;
 }
 
 void ting_feature_dns_process(char *buffer, uint16_t size)
 {
+    if(size > TING_DNS_MAX_SIZE + sizeof(ting_hdr_eth))
+    {
+        return;
+    }
+
     ting_hdr_eth *eth = (ting_hdr_eth*)buffer;
     if(eth->h_proto != ting_be16(ETH_P_IP))
     {
@@ -22,7 +29,23 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
     }
 
     ting_hdr_udp *udp = (ting_hdr_udp*)(buffer + sizeof(ting_hdr_eth) + (ip->ihl * 4));
-    printf("%s:%u", inet_ntoa((struct in_addr){.s_addr=ip->saddr}), ting_be16(udp->uh_sport));
-    printf(" -> ");
-    printf("%s:%u\n", inet_ntoa((struct in_addr){.s_addr=ip->daddr}), ting_be16(udp->uh_dport));
+    if(udp->dest != ting_be16(53))
+    {
+        return;
+    }
+
+    ting_hdr_dns *dns = (ting_hdr_dns*)udp;
+
+    if(dns->response != TING_DNS_RESPONSE_QUERY)
+    {
+        return;
+    }
+
+    if(dns->question_count != 1)
+    {
+        return;
+    }
+
+    debugf("%s\n", "Handling DNS packet");
 }
+
