@@ -41,8 +41,9 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
         return;
     }
 
-    if(dns->question_count != 1)
+    if(dns->question_count != ting_be16(1))
     {
+        // only handle one dns response
         return;
     }
 
