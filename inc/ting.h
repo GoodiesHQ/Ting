@@ -1,7 +1,6 @@
 #ifndef TING_TING_H
 #define TING_TING_H
 
-#define _GNU_SOURCE
 #include <ting/gre.h>
 #include <ting/packet.h>
 #include <ting/endian.h>
