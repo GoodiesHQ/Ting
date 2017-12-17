@@ -34,7 +34,7 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
         return;
     }
 
-    ting_hdr_dns *dns = (ting_hdr_dns*)((char*)udp + sizeof(struct dnshdr));
+    ting_hdr_dns *dns = (ting_hdr_dns*)((char*)udp + sizeof(ting_hdr_udp));
 
     if(dns->response != TING_DNS_RESPONSE_QUERY)
     {
