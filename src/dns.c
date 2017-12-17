@@ -29,7 +29,7 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
     }
 
     ting_hdr_udp *udp = (ting_hdr_udp*)(buffer + sizeof(ting_hdr_eth) + (ip->ihl * 4));
-    if(udp->dest != ting_be16(53))
+    if(udp->uh_dport != ting_be16(53))
     {
         return;
     }

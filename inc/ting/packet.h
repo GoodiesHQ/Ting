@@ -1,6 +1,7 @@
 #ifndef TING_PACKET_H
 #define TING_PACKET_H
 
+#define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <netinet/ether.h>
 #include <netinet/if_ether.h>
