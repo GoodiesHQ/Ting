@@ -21,14 +21,9 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
         return;
     }
 
-    struct in_addr saddr, daddr;
-    saddr.s_addr = ip->saddr;
-    daddr.s_addr = ip->daddr;
-
     ting_hdr_udp *udp = (ting_hdr_udp*)(buffer + sizeof(ting_hdr_eth) + (ip->ihl * 4));
     printf("%s:%u", inet_ntoa((struct in_addr){.s_addr=ip->saddr}), udp->uh_sport);
     puts("-> ");
     printf("%s:%u", inet_ntoa((struct in_addr){.s_addr=ip->daddr}), udp->uh_dport);
-
-    //puts("DNS Packet\n");
+    fputc('\n', stdout);
 }
