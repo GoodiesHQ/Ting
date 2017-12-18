@@ -11,9 +11,8 @@ bool ting_feature_dns_init(void)
 
 void ting_feature_dns_process(char *buffer, uint16_t size)
 {
-    unsigned char name[256]; // maximum name size
-    unsigned char cnt;
-    unsigned char *name_iter;
+    unsigned char name[256], cnt, *dns_iter; // maximum name size
+    const unsigned char *end = (unsigned char*)buffer + size;
     size_t name_size, i;
 
     if(size > TING_DNS_MAX_SIZE + sizeof(ting_hdr_eth))
@@ -51,19 +50,33 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
         return;
     }
 
-
-    name_iter = (unsigned char*)udp + sizeof(ting_hdr_dns);
+    dns_iter = (unsigned char*)dns + sizeof(ting_hdr_dns);
     name_size = 0;
-    while((cnt = *name_iter++) != 0)
+
+    while((cnt = *dns_iter++) != 0)
     {
-        for(i = 0; i < cnt; ++i)
+        for(i = 0; i < cnt && dns_iter != end; ++i)
         {
-            name[name_size++] = *name_iter++;
+            name[name_size++] = *dns_iter++;
         }
         name[name_size++] = '.';
     }
     name[name_size - 1] = '\0';
 
-    debugf("domain: %s\n", name);
+    if(dns_iter == end)
+    {
+        return;
+    }
+
+    debugf("Query Type Value: %u\n", *dns_iter);
+
+    switch(*dns_iter)
+    {
+        case TING_DNS_TYPE_A:
+            break;
+        default: return;
+    }
+
+    debugf("Handling DNS Query: %s\n", name);
 }
 

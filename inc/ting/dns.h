@@ -14,7 +14,6 @@ enum
     TING_DNS_RESPONSE_ANSWER = 1,
 };
 
-
 enum
 {
     TING_DNS_TYPE_A     = 0x01,
@@ -23,6 +22,13 @@ enum
 
 #define TING_DNS_MAX_SIZE 576
 char ting_buf_dns[TING_DNS_MAX_SIZE];
+
+struct{
+    const char *host;
+    uint16_t addr;
+} hosts[] = {
+        {.host="google.com", .addr=}
+};
 
 struct dnshdr
 {
