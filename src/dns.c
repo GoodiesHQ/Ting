@@ -11,6 +11,11 @@ bool ting_feature_dns_init(void)
 
 void ting_feature_dns_process(char *buffer, uint16_t size)
 {
+    unsigned char name[256]; // maximum name size
+    unsigned char cnt;
+    unsigned char *name_iter;
+    size_t name_size, i;
+
     if(size > TING_DNS_MAX_SIZE + sizeof(ting_hdr_eth))
     {
         return;
@@ -41,11 +46,24 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
         return;
     }
 
-    if(dns->question_count != ting_be16(1))
+    if(dns->question_count != ting_be16(1) || dns->answer_count != 0)
     {
         return;
     }
 
-    debugf("%s\n", "Handling DNS packet");
+
+    name_iter = (unsigned char*)udp + sizeof(ting_hdr_dns);
+    name_size = 0;
+    while((cnt = *name_iter++) != 0)
+    {
+        for(i = 0; i < cnt; ++i)
+        {
+            name[name_size++] = *name_iter++;
+        }
+        name[name_size++] = '.';
+    }
+    name[name_size - 1] = '\0';
+
+    debugf("domain: %s\n", name);
 }
 
