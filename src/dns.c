@@ -76,14 +76,16 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
     }
     ting_dns_name[name_size - 1] = '\0';
 
-    if(dns_iter == end)
+    if(dns_iter == end || dns_iter+1 == end)
     {
         return;
     }
 
-    debugf("Query Type Value: %u\n", *dns_iter);
+    uint16_t dns_type = ting_be16(*((uint16_t*)dns_iter));
 
-    switch(*dns_iter)
+    debugf("Query Type Value: %u\n", dns_type);
+
+    switch(dns_type)
     {
         case TING_DNS_TYPE_A:
             break;
