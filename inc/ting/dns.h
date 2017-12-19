@@ -23,12 +23,11 @@ enum
 #define TING_DNS_MAX_SIZE 576
 char ting_buf_dns[TING_DNS_MAX_SIZE];
 
-struct{
+typedef struct
+{
     const char *host;
-    uint16_t addr;
-} hosts[] = {
-        {.host="google.com", .addr=}
-};
+    uint32_t addr;
+} ting_dns_host;
 
 struct dnshdr
 {

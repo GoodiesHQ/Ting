@@ -2,10 +2,11 @@
 #define TING_PACKET_H
 
 #define TING_PKT_BUF_SIZE UINT16_MAX
+#define TING_OCTETS(a, b, c, d) \
+    (uint32_t)((a) | ((b) << 8) | ((c) << 16) | ((d) << 24))
+
+
 #include <ting/endian.h>
-
-#define OCTETS(a, b, c, d) ting_be32((a << 24) | (b << 16) | (c << 8) | (d))
-
 #include <arpa/inet.h>
 #include <netinet/ether.h>
 #include <netinet/if_ether.h>
@@ -21,7 +22,7 @@
 #include <sys/socket.h>
 #include <ting/gre.h>
 #include <ting/dns.h>
-*
+
 typedef struct ethhdr   ting_hdr_eth;
 typedef struct iphdr    ting_hdr_ip;
 typedef struct tcphdr   ting_hdr_tcp;
