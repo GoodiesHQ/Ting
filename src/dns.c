@@ -167,7 +167,7 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
         debugf("%s\n", "socket error.");
     }
 
-    ip_res->tot_len = (ip_res->ihl * sizeof(uint32_t)) + sizeof(ting_hdr_udp) + response_size;
+    ip_res->tot_len = ting_be16((ip_res->ihl * sizeof(uint32_t)) + sizeof(ting_hdr_udp) + response_size);
 
     client_sin.sin_family = AF_INET;
     client_sin.sin_port = udp->source;
