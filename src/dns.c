@@ -173,6 +173,9 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
     client_sin.sin_port = udp->source;
     client_sin.sin_addr.s_addr = ip->saddr;
 
+    memset(&client_sin.sin_zero, 0, sizeof(client_sin.sin_zero));
+    print_ip_header((unsigned char*)ip_res, sizeof(ting_hdr_ip));
+
     if(sendto(client_sock, ting_buf_dns, ip_res->tot_len, 0, (struct sockaddr*)&client_sin, sizeof(client_sin)) < 0)
     {
         debugf("%s\n", "sendto error.");
