@@ -2,6 +2,8 @@
 #define TING_DNS_H
 
 #include <ting/packet.h>
+#include <unistd.h>
+#include <ting/debug.h>
 
 /* Note:
  *
@@ -16,8 +18,13 @@ enum
 
 enum
 {
-    TING_DNS_TYPE_A     = 0x01,
+    TING_DNS_TYPE_A     = 0x0001,
     //TING_DNS_AAA, // TODO: think about it, maybe...
+};
+
+enum
+{
+    TING_DNS_CLASS_IN   = 0x0001,
 };
 
 #define TING_DNS_MAX_SIZE 576

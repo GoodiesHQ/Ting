@@ -1,14 +1,11 @@
-#include <ting/debug.h>
 #include <ting/dns.h>
-#include <stdio.h>
 
 static const ting_dns_host ting_dns_hosts[] = {
         (ting_dns_host){.host="google.com", .addr=TING_OCTETS(192, 168, 1, 10)},
 };
-
-static unsigned char ting_dns_name[256];
-
 static const size_t ting_dns_hosts_count = sizeof(ting_dns_hosts)/sizeof(ting_dns_host);
+
+static char ting_dns_name[256];
 
 bool ting_feature_dns_init(void)
 {
@@ -19,6 +16,9 @@ bool ting_feature_dns_init(void)
 
 void ting_feature_dns_process(char *buffer, uint16_t size)
 {
+    size_t response_size, response_offset;
+    int client_sock = -1;
+    struct sockaddr_in client_sin;
     unsigned char cnt, *dns_iter; // maximum name size
     const unsigned char *end = (unsigned char*)buffer + size;
     size_t name_size, i;
@@ -45,7 +45,7 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
         return;
     }
 
-    udp = (ting_hdr_udp*)(buffer + sizeof(ting_hdr_eth) + (ip->ihl * 4));
+    udp = (ting_hdr_udp*)(buffer + sizeof(ting_hdr_eth) + (ip->ihl * sizeof(uint32_t)));
     if(udp->dest != ting_be16(53))
     {
         return;
@@ -83,8 +83,7 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
 
     uint16_t dns_type = ting_be16(*((uint16_t*)dns_iter));
 
-    debugf("Query Type Value: %u\n", dns_type);
-
+    /* Only handling DNS A records */
     switch(dns_type)
     {
         case TING_DNS_TYPE_A:
@@ -92,39 +91,97 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
         default: return;
     }
 
-    debugf("Handling DNS A Query: %s\n", ting_dns_name);
+    dns_iter += sizeof(uint16_t);
+
+    uint16_t dns_class = ting_be16(*((uint16_t*)dns_iter));
+    switch(dns_class)
+    {
+        case TING_DNS_CLASS_IN:
+            break;
+        default: return;
+    }
+
+    for(i = 0; i < ting_dns_hosts_count; ++i)
+    {
+        if(strncmp(ting_dns_name, ting_dns_hosts[i].host, name_size) == 0)
+        {
+            break;
+        }
+    }
+    debugf("Handling DNS A Record Query: %s\n", ting_dns_name);
 
 
-    ip_res = (ting_hdr_ip*)ting_buf_dns;
-    ip_res->frag_off = ting_be16(0x4000);
-    ip_res->protocol = IPPROTO_UDP;
-    ip_res->ihl = 5;
-    ip_res->version = ip->version;
-    ip_res->ttl = 64;
-    ip_res->check = 0;
+    /* Set up IP header */
+    ip_res              = (ting_hdr_ip*)ting_buf_dns;
+    ip_res->frag_off    = ting_be16(0x4000); // no fragmenting
+    ip_res->protocol    = IPPROTO_UDP;
+    ip_res->ihl         = 5;  // no additional options
+    ip_res->version     = ip->version;
+    ip_res->ttl         = 64; // TODO: maybe decrease this value to make it look like it came from a remote server?
+    ip_res->check       = 0;
+    ip_res->saddr       = ip->daddr;
+    ip_res->daddr       = ip->saddr;
 
-    ip_res->saddr = ip->daddr;
-    ip_res->daddr = ip->saddr;
 
-    udp_res = (ting_hdr_udp*)(ting_buf_dns + (ip_res->ihl * 4));
-    udp_res->check = 0;
-    udp_res->source = udp->dest;
-    udp_res->dest = udp->source;
+    /* Set up UDP header */
+    udp_res             = (ting_hdr_udp*)(ting_buf_dns + (ip_res->ihl * 4));
+    udp_res->check      = 0; // ignore checksum
+    udp_res->source     = udp->dest;
+    udp_res->dest       = udp->source;
+    udp_res->len        = 0;
 
-    dns_res = (ting_hdr_dns*)((char*)udp_res + sizeof(ting_hdr_udp));
+    /* Set up DNS header */
+    dns_res                         = (ting_hdr_dns*)((char*)udp_res + sizeof(ting_hdr_udp));
+    dns_res->id                     = dns->id;
+    dns_res->recursion_desired      = dns->recursion_desired;
+    dns_res->truncated              = false;
+    dns_res->authoritative_answer   = false;
+    dns_res->opcode                 = 0;
+    dns_res->response               = TING_DNS_RESPONSE_ANSWER; // create an answer packet
+    dns_res->response_code          = 0;
+    dns_res->checking_disabled      = dns->checking_disabled;
+    dns_res->authentic_data         = false;
+    dns_res->unused                 = 0;
+    dns_res->recursion_available    = true;
+    dns_res->question_count         = 1;
+    dns_res->answer_count           = 1;
+    dns_res->authority_count        = 0;
 
-    dns->response = TING_DNS_RESPONSE_ANSWER; // create an answer packet
-    dns_res->opcode = 0;
-    dns_res->authoritative_answer = false;
-    dns_res->truncated = false;
-    dns_res->recursion_desired = true;
-    dns_res->recursion_available = true;
-    dns_res->unused = false;
-    dns_res->authentic_data = false;
-    dns_res->response_code = 0;
-    dns_res->question_count = 1;
-    dns_res->answer_count = 1;
+    // pointer to the first name
+    response_offset = sizeof(ting_hdr_dns);
+    response_size = sizeof(ting_hdr_dns);
 
-    udp_res->len = 0;
+    memcpy((char*)dns_res + response_size, (char*)dns + sizeof(ting_hdr_dns), name_size);
+
+    response_size += name_size;
+    *((uint16_t*)((char*)dns_res + response_size)) = ting_be16(TING_DNS_TYPE_A);
+    response_size += sizeof(uint16_t);
+    *((uint16_t*)((char*)dns_res + response_size)) = ting_be16(TING_DNS_CLASS_IN);
+    response_size += sizeof(uint16_t);
+
+    *((uint16_t*)((char*)dns_res + response_size)) = ting_be16((uint16_t)((0b11 << 14) | response_offset));
+    response_size += sizeof(uint16_t);
+
+    if((client_sock = socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) < 0)
+    {
+        debugf("%s\n", "socket error.");
+    }
+
+    ip_res->tot_len = (ip_res->ihl * sizeof(uint32_t)) + sizeof(ting_hdr_udp) + response_size;
+
+    client_sin.sin_family = AF_INET;
+    client_sin.sin_port = udp->source;
+    client_sin.sin_addr.s_addr = ip->saddr;
+
+    if(sendto(client_sock, ting_buf_dns, ip_res->tot_len, 0, (struct sockaddr*)&client_sin, sizeof(client_sin)) < 0)
+    {
+        debugf("%s\n", "sendto error.");
+    }
+    else
+    {
+        debugf("%s\n", "Sent DNS answer.");
+    }
+
+    close(client_sock);
 }
 
