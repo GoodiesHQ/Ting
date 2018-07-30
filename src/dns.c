@@ -5,8 +5,6 @@ static const ting_dns_host ting_dns_hosts[] = {
 };
 static const size_t ting_dns_hosts_count = sizeof(ting_dns_hosts)/sizeof(ting_dns_host);
 
-static char ting_dns_name[256];
-
 bool ting_feature_dns_init(void)
 {
     debugf("%s\n", "Starting DNS feature");
@@ -16,36 +14,43 @@ bool ting_feature_dns_init(void)
 
 void ting_feature_dns_process(char *buffer, uint16_t size)
 {
+    char ting_dns_name[256];
     size_t response_size, response_offset;
     int client_sock = -1;
     struct sockaddr_in client_sin;
-    unsigned char cnt, *dns_iter; // maximum name size
+    unsigned char cnt, *dns_iter;
     const unsigned char *end = (unsigned char*)buffer + size;
     size_t name_size, i;
 
+    // ethernet header
     ting_hdr_eth *eth;
     ting_hdr_ip *ip, *ip_res;
     ting_hdr_udp *udp, *udp_res;
     ting_hdr_dns *dns, *dns_res;
 
+    // check if the incoming frame is too large to handle.
     if(size > TING_DNS_MAX_SIZE + sizeof(ting_hdr_eth))
     {
         return;
     }
 
+    // check if the frame is an ethernet frame contains an IP packet.
     eth = (ting_hdr_eth*)buffer;
     if(eth->h_proto != ting_be16(ETH_P_IP))
     {
         return;
     }
 
+    // check if the incoming packet is UDP.
     ip = (ting_hdr_ip*)(buffer + sizeof(ting_hdr_eth));
     if(ip->protocol != IPPROTO_UDP)
     {
         return;
     }
 
+    // check if the incoming UDP datagram is destined for port 53.
     udp = (ting_hdr_udp*)(buffer + sizeof(ting_hdr_eth) + (ip->ihl * sizeof(uint32_t)));
+    print_udp_header((unsigned char*)udp, 0);
     if(udp->dest != ting_be16(53))
     {
         return;
@@ -58,6 +63,7 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
         return;
     }
 
+    // don't bother with multi-question DNS packets... I'm not reading RFC's for this shit.
     if(dns->question_count != ting_be16(1) || dns->answer_count != 0)
     {
         return;
@@ -83,14 +89,14 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
 
     uint16_t dns_type = ting_be16(*((uint16_t*)dns_iter));
 
-    /* Only handling DNS A records */
+    // Only handling DNS A records
     switch(dns_type)
     {
         case TING_DNS_TYPE_A:
             break;
-        default: return;
+        default:
+            return;
     }
-    debugf("Handling DNS A record for %s\n", ting_dns_name);
 
     dns_iter += sizeof(uint16_t);
 
@@ -99,13 +105,16 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
     {
         case TING_DNS_CLASS_IN:
             break;
-        default: return;
+        default:
+            return;
     }
+    debugf("Handling DNS A record for %s\n", ting_dns_name);
 
     for(i = 0; i < ting_dns_hosts_count; ++i)
     {
         if(strncmp(ting_dns_name, ting_dns_hosts[i].host, name_size) == 0)
         {
+            debugf("%s\n", "YES!");
             break;
         }
     }
