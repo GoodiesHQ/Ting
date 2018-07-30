@@ -1,7 +1,7 @@
 #include <ting/dns.h>
 
 static const ting_dns_host ting_dns_hosts[] = {
-        (ting_dns_host){.host="google.com", .addr=TING_OCTETS(192, 168, 1, 10)},
+        (ting_dns_host){.host="google.com", .addr=TING_OCTETS(1, 3, 3, 7)},
 };
 static const size_t ting_dns_hosts_count = sizeof(ting_dns_hosts)/sizeof(ting_dns_host);
 
@@ -90,6 +90,7 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
             break;
         default: return;
     }
+    debugf("Handling DNS A record for %s\n", ting_dns_name);
 
     dns_iter += sizeof(uint16_t);
 
@@ -108,8 +109,6 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
             break;
         }
     }
-    debugf("Handling DNS A Record Query: %s\n", ting_dns_name);
-
 
     /* Set up IP header */
     ip_res              = (ting_hdr_ip*)ting_buf_dns;
@@ -162,6 +161,8 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
     *((uint16_t*)((char*)dns_res + response_size)) = ting_be16((uint16_t)((0b11 << 14) | response_offset));
     response_size += sizeof(uint16_t);
 
+    udp_res->len = ting_be16(response_size);
+
     if((client_sock = socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) < 0)
     {
         debugf("%s\n", "socket error.");
@@ -175,6 +176,7 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
 
     memset(&client_sin.sin_zero, 0, sizeof(client_sin.sin_zero));
     print_ip_header((unsigned char*)ip_res, sizeof(ting_hdr_ip));
+    print_udp_header((unsigned char*)udp_res, sizeof(ting_hdr_udp));
 
     if(sendto(client_sock, ting_buf_dns, ip_res->tot_len, 0, (struct sockaddr*)&client_sin, sizeof(client_sin)) < 0)
     {

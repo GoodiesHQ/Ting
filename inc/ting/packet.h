@@ -24,11 +24,18 @@
 #include <ting/dns.h>
 #include <ting/debug.h>
 
+typedef struct ethhdr   ting_hdr_eth;
+typedef struct iphdr    ting_hdr_ip;
+typedef struct tcphdr   ting_hdr_tcp;
+typedef struct udphdr   ting_hdr_udp;
+typedef struct dnshdr   ting_hdr_dns;
+typedef struct grehdr   ting_hdr_gre; // Note: this is the slight variant of GRE used by PPTP
+
 #ifdef TING_DEBUG
-static void print_ip_header(unsigned char* Buffer, int Size)
+static void print_ip_header(unsigned char* buffer, size_t size)
 {
 
-    struct iphdr *iph = (struct iphdr *)Buffer;
+    ting_hdr_ip *iph = (ting_hdr_ip*)buffer;
     unsigned long iphdrlen =iph->ihl*4;
     struct sockaddr_in source, dest;
     FILE *logfile = stdout;
@@ -55,16 +62,21 @@ static void print_ip_header(unsigned char* Buffer, int Size)
     fprintf(logfile,"   |-Source IP        : %s\n",inet_ntoa(source.sin_addr));
     fprintf(logfile,"   |-Destination IP   : %s\n",inet_ntoa(dest.sin_addr));
 }
+
+static void print_udp_header(unsigned char* buffer, size_t size)
+{
+    ting_hdr_udp *udph = (ting_hdr_udp*)buffer;
+    FILE *logfile = stdout;
+    fprintf(logfile,"\n");
+    fprintf(logfile,"UDP Header\n");
+    fprintf(logfile,"   |-Source Port       : %d\n", ting_be16(udph->source));
+    fprintf(logfile,"   |-Destination Port  : %d\n", ting_be16(udph->dest));
+    fprintf(logfile,"   |-UDP Length        : %d\n", ting_be16(udph->len));
+    fprintf(logfile,"   |-UDP Checksum      : %X\n", ting_be16(udph->check));
+}
 #else
 #define print_ip_header(...)
 #endif
-
-typedef struct ethhdr   ting_hdr_eth;
-typedef struct iphdr    ting_hdr_ip;
-typedef struct tcphdr   ting_hdr_tcp;
-typedef struct udphdr   ting_hdr_udp;
-typedef struct dnshdr   ting_hdr_dns;
-typedef struct grehdr   ting_hdr_gre; // Note: this is the slight variant of GRE used by PPTP
 
 char ting_buf_pkt[TING_PKT_BUF_SIZE];
 
