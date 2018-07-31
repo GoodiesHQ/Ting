@@ -7,12 +7,12 @@ if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
   let s:wipebuf = bufnr('%')
 endif
 set shortmess=aoO
-badd +1 ~/Programming/c/Ting/ting
+badd +1 ~/Programming/c/Ting/ting_proj
 argglobal
 silent! argdel *
 set lines=17 columns=132
 winpos 963 731
-edit ~/Programming/c/Ting/ting
+edit ~/Programming/c/Ting/ting_proj
 set splitbelow splitright
 wincmd _ | wincmd |
 split
@@ -76,7 +76,7 @@ setlocal fdn=20
 setlocal nofen
 wincmd w
 argglobal
-if bufexists('~/Programming/c/Ting/ting') | buffer ~/Programming/c/Ting/ting | else | edit ~/Programming/c/Ting/ting | endif
+if bufexists('~/Programming/c/Ting/ting_proj') | buffer ~/Programming/c/Ting/ting_proj | else | edit ~/Programming/c/Ting/ting_proj | endif
 setlocal fdm=manual
 setlocal fde=0
 setlocal fmr={{{,}}}
