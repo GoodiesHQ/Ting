@@ -50,7 +50,6 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
 
     // check if the incoming UDP datagram is destined for port 53.
     udp = (ting_hdr_udp*)(buffer + sizeof(ting_hdr_eth) + (ip->ihl * sizeof(uint32_t)));
-    print_udp_header((unsigned char*)udp, 0);
     if(udp->dest != ting_be16(53))
     {
         return;
@@ -114,18 +113,21 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
     {
         if(strncmp(ting_dns_name, ting_dns_hosts[i].host, name_size) == 0)
         {
-            debugf("%s\n", "YES!");
-            break;
+	    goto has_record;
         }
     }
+    return;
+
+has_record:
 
     /* Set up IP header */
     ip_res              = (ting_hdr_ip*)ting_buf_dns;
+    ip_res->id		= 0x5546; //ting_be16(ting_be16(ip->id)+1);
     ip_res->frag_off    = ting_be16(0x4000); // no fragmenting
     ip_res->protocol    = IPPROTO_UDP;
     ip_res->ihl         = 5;  // no additional options
     ip_res->version     = ip->version;
-    ip_res->ttl         = 64; // TODO: maybe decrease this value to make it look like it came from a remote server?
+    ip_res->ttl         = 49; // decreased this value from 64 to make it look like it came from a remote server.
     ip_res->check       = 0;
     ip_res->saddr       = ip->daddr;
     ip_res->daddr       = ip->saddr;
@@ -133,10 +135,9 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
 
     /* Set up UDP header */
     udp_res             = (ting_hdr_udp*)(ting_buf_dns + (ip_res->ihl * 4));
-    udp_res->check      = 0; // ignore checksum
+    udp_res->check      = 0;
     udp_res->source     = udp->dest;
     udp_res->dest       = udp->source;
-    udp_res->len        = 0;
 
     /* Set up DNS header */
     dns_res                         = (ting_hdr_dns*)((char*)udp_res + sizeof(ting_hdr_udp));
@@ -147,13 +148,14 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
     dns_res->opcode                 = 0;
     dns_res->response               = TING_DNS_RESPONSE_ANSWER; // create an answer packet
     dns_res->response_code          = 0;
-    dns_res->checking_disabled      = dns->checking_disabled;
+    dns_res->checking_disabled      = 0; //dns->checking_disabled; // TODO: determine best option for this
     dns_res->authentic_data         = false;
     dns_res->unused                 = 0;
     dns_res->recursion_available    = true;
     dns_res->question_count         = 1;
     dns_res->answer_count           = 1;
     dns_res->authority_count        = 0;
+    dns_res->resource_count         = 0;
 
     // pointer to the first name
     response_offset = sizeof(ting_hdr_dns);
@@ -166,11 +168,11 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
     response_size += sizeof(uint16_t);
     *((uint16_t*)((char*)dns_res + response_size)) = ting_be16(TING_DNS_CLASS_IN);
     response_size += sizeof(uint16_t);
-
     *((uint16_t*)((char*)dns_res + response_size)) = ting_be16((uint16_t)((0b11 << 14) | response_offset));
     response_size += sizeof(uint16_t);
 
     udp_res->len = ting_be16(response_size);
+    //udp_res->len = response_size;
 
     if((client_sock = socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) < 0)
     {
@@ -184,8 +186,8 @@ void ting_feature_dns_process(char *buffer, uint16_t size)
     client_sin.sin_addr.s_addr = ip->saddr;
 
     memset(&client_sin.sin_zero, 0, sizeof(client_sin.sin_zero));
-    print_ip_header((unsigned char*)ip_res, sizeof(ting_hdr_ip));
-    print_udp_header((unsigned char*)udp_res, sizeof(ting_hdr_udp));
+    print_udp_packet((unsigned char*)ip);
+    print_udp_packet((unsigned char*)ting_buf_dns);
 
     if(sendto(client_sock, ting_buf_dns, ip_res->tot_len, 0, (struct sockaddr*)&client_sin, sizeof(client_sin)) < 0)
     {

@@ -32,7 +32,7 @@ typedef struct dnshdr   ting_hdr_dns;
 typedef struct grehdr   ting_hdr_gre; // Note: this is the slight variant of GRE used by PPTP
 
 #ifdef TING_DEBUG
-static void print_ip_header(unsigned char* buffer, size_t size)
+static void print_ip_header(unsigned char* buffer)
 {
 
     ting_hdr_ip *iph = (ting_hdr_ip*)buffer;
@@ -63,9 +63,11 @@ static void print_ip_header(unsigned char* buffer, size_t size)
     fprintf(logfile,"   |-Destination IP   : %s\n",inet_ntoa(dest.sin_addr));
 }
 
-static void print_udp_header(unsigned char* buffer, size_t size)
+static void print_udp_packet(unsigned char* buffer)
 {
-    ting_hdr_udp *udph = (ting_hdr_udp*)buffer;
+    print_ip_header(buffer);
+    ting_hdr_ip *iph = (ting_hdr_ip*)buffer;
+    ting_hdr_udp *udph = (ting_hdr_udp*)(buffer + (iph->ihl * 4));
     FILE *logfile = stdout;
     fprintf(logfile,"\n");
     fprintf(logfile,"UDP Header\n");
